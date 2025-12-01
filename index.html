@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Mobile Converter & Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            500: '#ff0000', // YouTube Red-ish
+                            600: '#cc0000',
+                        },
+                        dark: {
+                            800: '#1f1f1f',
+                            900: '#121212',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for Queue */
+        .custom-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+        .dark .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+        }
+        
+        /* Smooth transitions */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 dark:bg-dark-900 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white dark:bg-dark-800 shadow-md sticky top-0 z-40 transition-colors duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fa-brands fa-youtube text-brand-500 text-2xl"></i>
+                <h1 class="text-lg font-bold tracking-tight hidden sm:block">YT Mobile Tools</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" aria-label="Toggle Theme">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                </button>
+                <button id="settingsBtn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" aria-label="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6 flex-grow flex flex-col lg:flex-row gap-6">
+        
+        <!-- Left Column: Converter & Player -->
+        <div class="w-full lg:w-2/3 space-y-6">
+            
+            <!-- Converter Card -->
+            <div class="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 transition-colors duration-300">
+                <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <i class="fas fa-link text-brand-500"></i> URL Converter
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste YouTube URL (Video or Playlist)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." 
+                                class="flex-grow p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 outline-none transition-colors">
+                            <button id="convertBtn" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                                Convert
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Area (Hidden initially) -->
+                    <div id="resultArea" class="hidden fade-in space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                        <div>
+                            <label class="block text-xs font-uppercase text-gray-500 dark:text-gray-400 mb-1">Mobile URL</label>
+                            <div class="flex gap-2 bg-gray-100 dark:bg-gray-900 p-2 rounded-lg items-center">
+                                <code id="mobileUrlDisplay" class="flex-grow text-sm truncate px-2 font-mono text-brand-600 dark:text-brand-500"></code>
+                                <button id="copyBtn" class="p-2 text-gray-500 hover:text-brand-500" title="Copy">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                <a id="openBtn" href="#" target="_blank" class="p-2 text-gray-500 hover:text-brand-500" title="Open">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button id="addToQueueBtn" class="flex-1 bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white py-2 rounded-lg transition-colors text-sm">
+                                <i class="fas fa-list me-2"></i> Add to Queue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Card -->
+            <div id="playerCard" class="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 transition-colors duration-300 hidden fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold flex items-center gap-2">
+                        <i class="fas fa-play-circle text-brand-500"></i> Player
+                    </h2>
+                    <span id="playerSourceLabel" class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        Source: YouTube
+                    </span>
+                </div>
+
+                <!-- Embed Container -->
+                <div class="relative w-full pt-[56.25%] bg-black rounded-lg overflow-hidden shadow-lg group">
+                    <iframe id="mainPlayer" class="absolute top-0 left-0 w-full h-full" 
+                        src="" title="Video player" frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen>
+                    </iframe>
+                    
+                    <!-- Fallback overlay if needed -->
+                    <div id="embedFallback" class="hidden absolute top-0 left-0 w-full h-full bg-gray-900 flex flex-col items-center justify-center text-white p-6 text-center z-10">
+                        <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-3"></i>
+                        <h3 class="text-lg font-bold">Embedding Not Allowed</h3>
+                        <p class="text-sm text-gray-400 mb-4">This instance or video prevents embedding.</p>
+                        <a id="fallbackLink" href="#" target="_blank" class="bg-brand-500 hover:bg-brand-600 px-4 py-2 rounded text-white">
+                            Open in New Tab
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                    <div class="flex items-center gap-2">
+                        <span id="contentTypeBadge" class="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-gray-200 dark:bg-gray-700">Video</span>
+                        <p id="currentVideoId" class="font-mono text-xs"></p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                         <button id="toggleBackendBtn" class="text-brand-500 hover:underline text-xs">
+                            Switch Backend
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Queue -->
+        <div class="w-full lg:w-1/3">
+            <div class="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 h-full flex flex-col transition-colors duration-300 max-h-[800px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold flex items-center gap-2">
+                        <i class="fas fa-list-ul text-brand-500"></i> Queue
+                    </h2>
+                    <button id="clearQueueBtn" class="text-xs text-red-500 hover:text-red-700 font-medium">
+                        Clear All
+                    </button>
+                </div>
+
+                <div id="queueList" class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-1">
+                    <!-- Queue Items Injected Here -->
+                    <div class="text-center py-10 text-gray-400">
+                        <i class="fas fa-inbox text-4xl mb-2 opacity-50"></i>
+                        <p>Queue is empty</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 hidden">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="modalBackdrop"></div>
+        
+        <!-- Content -->
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-dark-800 rounded-xl shadow-2xl p-6 transition-colors duration-300 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
+                <h2 class="text-xl font-bold">Settings</h2>
+                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 dark:hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Ad Blocking / Heuristics -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Privacy & Ads</h3>
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="relative inline-flex items-center cursor-pointer mt-1">
+                        <input type="checkbox" id="preferInvidiousToggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-500/20 dark:peer-focus:ring-brand-500/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-500"></div>
+                    </div>
+                    <div>
+                        <span class="font-medium block">Prefer Invidious Playback</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                            Reduces ads by using Invidious instances instead of YouTube. 
+                        </span>
+                    </div>
+                </label>
+                <div class="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-xs text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-900/50">
+                    <strong>Disclaimer:</strong> Public instances may log IPs. No guarantee of ad removal. Instances may go offline or block embeds.
+                </div>
+            </div>
+
+            <!-- Instance Selection -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Invidious Instance</h3>
+                
+                <label class="block text-sm mb-2">Select Public Instance</label>
+                <select id="instanceSelect" class="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 mb-3">
+                    <option value="inv.nadeko.net">inv.nadeko.net</option>
+                    <option value="yewtu.be">yewtu.be</option>
+                    <option value="invidious.f5.si">invidious.f5.si</option>
+                    <option value="invidious.nerdvpn.de">invidious.nerdvpn.de</option>
+                    <option value="inv.perditum.com">inv.perditum.com</option>
+                    <option value="custom">Custom...</option>
+                </select>
+
+                <div id="customInstanceWrapper" class="hidden mb-3">
+                    <label class="block text-xs mb-1">Custom Instance URL (no https://)</label>
+                    <input type="text" id="customInstanceInput" placeholder="example.com" class="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                </div>
+
+                <div class="flex items-center justify-between mt-2">
+                    <button id="testInstanceBtn" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-3 py-1.5 rounded transition-colors">
+                        Test Connection
+                    </button>
+                    <span id="instanceStatus" class="text-xs font-bold hidden"></span>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2">Note: A "Failed" test may be due to CORS settings, but playback might still work.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // --- Constants & State ---
+        const DEFAULT_INSTANCES = [
+            "inv.nadeko.net",
+            "yewtu.be",
+            "invidious.f5.si",
+            "invidious.nerdvpn.de",
+            "inv.perditum.com"
+        ];
+        
+        const STORAGE_KEYS = {
+            THEME: 'yt_mobile_theme',
+            SETTINGS: 'yt_mobile_settings',
+            QUEUE: 'yt_mobile_queue'
+        };
+
+        let state = {
+            currentMedia: null, // { id, type, originalUrl, mobileUrl }
+            queue: [],
+            settings: {
+                preferInvidious: false,
+                selectedInstance: 'inv.nadeko.net',
+                customInstance: ''
+            }
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            html: document.documentElement,
+            themeToggle: document.getElementById('themeToggle'),
+            settingsBtn: document.getElementById('settingsBtn'),
+            urlInput: document.getElementById('urlInput'),
+            convertBtn: document.getElementById('convertBtn'),
+            resultArea: document.getElementById('resultArea'),
+            mobileUrlDisplay: document.getElementById('mobileUrlDisplay'),
+            copyBtn: document.getElementById('copyBtn'),
+            openBtn: document.getElementById('openBtn'),
+            addToQueueBtn: document.getElementById('addToQueueBtn'),
+            playerCard: document.getElementById('playerCard'),
+            mainPlayer: document.getElementById('mainPlayer'),
+            embedFallback: document.getElementById('embedFallback'),
+            fallbackLink: document.getElementById('fallbackLink'),
+            queueList: document.getElementById('queueList'),
+            clearQueueBtn: document.getElementById('clearQueueBtn'),
+            settingsModal: document.getElementById('settingsModal'),
+            modalBackdrop: document.getElementById('modalBackdrop'),
+            closeModalBtn: document.getElementById('closeModalBtn'),
+            preferInvidiousToggle: document.getElementById('preferInvidiousToggle'),
+            instanceSelect: document.getElementById('instanceSelect'),
+            customInstanceWrapper: document.getElementById('customInstanceWrapper'),
+            customInstanceInput: document.getElementById('customInstanceInput'),
+            testInstanceBtn: document.getElementById('testInstanceBtn'),
+            instanceStatus: document.getElementById('instanceStatus'),
+            playerSourceLabel: document.getElementById('playerSourceLabel'),
+            toggleBackendBtn: document.getElementById('toggleBackendBtn'),
+            currentVideoId: document.getElementById('currentVideoId'),
+            contentTypeBadge: document.getElementById('contentTypeBadge')
+        };
+
+        // --- Initialization ---
+        function init() {
+            // Load Theme
+            const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                els.html.classList.add('dark');
+            } else {
+                els.html.classList.remove('dark');
+            }
+
+            // Load Settings
+            const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+            if (savedSettings) {
+                state.settings = { ...state.settings, ...JSON.parse(savedSettings) };
+            }
+
+            // Load Queue
+            const savedQueue = localStorage.getItem(STORAGE_KEYS.QUEUE);
+            if (savedQueue) {
+                state.queue = JSON.parse(savedQueue);
+            }
+
+            // Apply Settings to UI
+            els.preferInvidiousToggle.checked = state.settings.preferInvidious;
+            
+            const isCustom = !DEFAULT_INSTANCES.includes(state.settings.selectedInstance);
+            els.instanceSelect.value = isCustom ? 'custom' : state.settings.selectedInstance;
+            
+            if (isCustom) {
+                els.customInstanceWrapper.classList.remove('hidden');
+                els.customInstanceInput.value = state.settings.selectedInstance;
+            } else {
+                els.customInstanceWrapper.classList.add('hidden');
+            }
+
+            renderQueue();
+            setupEventListeners();
+        }
+
+        // --- Logic: URL Parsing ---
+        function parseYoutubeUrl(url) {
+            // 1. Try to find a specific Video ID
+            const vidRegex = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/;
+            const vidMatch = url.match(vidRegex);
+            if (vidMatch) {
+                return { type: 'video', id: vidMatch[1] };
+            }
+
+            // 2. Try to find a Playlist ID (if no video ID found, or explicit list request)
+            // Note: A URL can have both v= and list=. We prioritized v= above for single video playback.
+            // If the user just pastes a playlist URL:
+            const listRegex = /[?&]list=([^#\&\?]+)/;
+            const listMatch = url.match(listRegex);
+            if (listMatch) {
+                return { type: 'playlist', id: listMatch[1] };
+            }
+
+            return null;
+        }
+
+        function generateMobileUrl(data) {
+            if (data.type === 'playlist') {
+                return `https://m.youtube.com/playlist?list=${data.id}`;
+            }
+            return `https://m.youtube.com/watch?v=${data.id}`;
+        }
+
+        // --- Logic: Converter ---
+        function handleConvert() {
+            const input = els.urlInput.value.trim();
+            if (!input) return;
+
+            const parsed = parseYoutubeUrl(input);
+
+            if (!parsed) {
+                alert("Invalid YouTube URL");
+                return;
+            }
+
+            const mobileUrl = generateMobileUrl(parsed);
+
+            state.currentMedia = {
+                id: parsed.id,
+                type: parsed.type,
+                originalUrl: input,
+                mobileUrl: mobileUrl
+            };
+
+            // Update UI
+            els.mobileUrlDisplay.textContent = mobileUrl;
+            els.openBtn.href = mobileUrl;
+            els.resultArea.classList.remove('hidden');
+            
+            // Load Player
+            loadMedia(parsed);
+        }
+
+        // --- Logic: Player ---
+        function loadMedia(mediaData, forceBackend = null) {
+            els.playerCard.classList.remove('hidden');
+            els.embedFallback.classList.add('hidden');
+            els.currentVideoId.textContent = `ID: ${mediaData.id}`;
+            els.contentTypeBadge.textContent = mediaData.type;
+            
+            // Determine Backend
+            const useInvidious = forceBackend !== null ? forceBackend : state.settings.preferInvidious;
+            let src = '';
+            let sourceLabel = '';
+            const instance = state.settings.selectedInstance || 'inv.nadeko.net';
+
+            if (useInvidious) {
+                sourceLabel = `Source: Invidious (${instance})`;
+                if (mediaData.type === 'playlist') {
+                     // Invidious playlist embed format: /embed?list=PL...
+                     src = `https://${instance}/embed?list=${mediaData.id}`;
+                     els.fallbackLink.href = `https://${instance}/playlist?list=${mediaData.id}`;
+                } else {
+                     src = `https://${instance}/embed/${mediaData.id}?autoplay=1`;
+                     els.fallbackLink.href = `https://${instance}/watch?v=${mediaData.id}`;
+                }
+            } else {
+                sourceLabel = 'Source: YouTube';
+                if (mediaData.type === 'playlist') {
+                    src = `https://www.youtube.com/embed?listType=playlist&list=${mediaData.id}`;
+                    els.fallbackLink.href = `https://www.youtube.com/playlist?list=${mediaData.id}`;
+                } else {
+                    src = `https://www.youtube.com/embed/${mediaData.id}?autoplay=1`;
+                    els.fallbackLink.href = `https://www.youtube.com/watch?v=${mediaData.id}`;
+                }
+            }
+
+            els.mainPlayer.src = src;
+            els.playerSourceLabel.textContent = sourceLabel;
+            
+            // Store what's currently playing to toggle logic
+            els.mainPlayer.dataset.backend = useInvidious ? 'invidious' : 'youtube';
+        }
+
+        function toggleBackend() {
+            if(!state.currentMedia) return;
+            const currentBackend = els.mainPlayer.dataset.backend;
+            const newBackendIsInvidious = currentBackend === 'youtube';
+            loadMedia(state.currentMedia, newBackendIsInvidious);
+        }
+
+        // --- Logic: Queue ---
+        function addToQueue() {
+            if (!state.currentMedia) return;
+
+            // Add timestamp to make unique if adding same video twice
+            const item = {
+                ...state.currentMedia,
+                uid: Date.now(),
+                addedAt: new Date().toLocaleString(),
+                preferredBackend: state.settings.preferInvidious ? 'invidious' : 'youtube',
+                instance: state.settings.selectedInstance
+            };
+
+            state.queue.push(item);
+            saveQueue();
+            renderQueue();
+        }
+
+        function removeFromQueue(uid) {
+            state.queue = state.queue.filter(item => item.uid !== uid);
+            saveQueue();
+            renderQueue();
+        }
+
+        function moveQueueItem(index, direction) {
+            if (direction === 'up' && index > 0) {
+                [state.queue[index], state.queue[index - 1]] = [state.queue[index - 1], state.queue[index]];
+            } else if (direction === 'down' && index < state.queue.length - 1) {
+                [state.queue[index], state.queue[index + 1]] = [state.queue[index + 1], state.queue[index]];
+            }
+            saveQueue();
+            renderQueue();
+        }
+
+        function clearQueue() {
+            if(confirm('Clear entire queue?')) {
+                state.queue = [];
+                saveQueue();
+                renderQueue();
+            }
+        }
+
+        function saveQueue() {
+            localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(state.queue));
+        }
+
+        function renderQueue() {
+            const list = els.queueList;
+            list.innerHTML = '';
+
+            if (state.queue.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-10 text-gray-400 dark:text-gray-600">
+                        <i class="fas fa-inbox text-4xl mb-2 opacity-50"></i>
+                        <p>Queue is empty</p>
+                    </div>
+                `;
+                return;
+            }
+
+            state.queue.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg group border border-gray-200 dark:border-gray-700';
+                const typeBadge = item.type === 'playlist' 
+                    ? '<span class="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-1 rounded">PLAYLIST</span>'
+                    : '<span class="text-[10px] bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-1 rounded">VIDEO</span>';
+                
+                el.innerHTML = `
+                    <div class="flex justify-between items-start gap-3">
+                        <div class="min-w-0 flex-grow">
+                            <div class="flex items-center gap-2 mb-1">
+                                ${typeBadge}
+                                <div class="font-mono text-xs text-brand-500 truncate">${item.id}</div>
+                            </div>
+                            <div class="text-xs text-gray-500 mb-2 truncate">${item.mobileUrl}</div>
+                            
+                            <div class="flex gap-2">
+                                <button onclick="playQueueItem(${index})" class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-3 py-1 rounded flex items-center gap-1 transition-colors">
+                                    <i class="fas fa-play"></i> Play
+                                </button>
+                                <button onclick="toggleQueueEmbed(${item.uid})" class="bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 text-gray-700 dark:text-gray-200 text-xs px-3 py-1 rounded transition-colors">
+                                    <i class="fas fa-expand"></i> Inline
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <button onclick="moveQueueItem(${index}, 'up')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" ${index === 0 ? 'disabled style="opacity:0.3"' : ''}>
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                            <button onclick="moveQueueItem(${index}, 'down')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" ${index === state.queue.length - 1 ? 'disabled style="opacity:0.3"' : ''}>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <button onclick="removeFromQueue(${item.uid})" class="text-red-400 hover:text-red-600 mt-1">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Inline Player Container -->
+                    <div id="inline-player-${item.uid}" class="hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                        <div class="relative w-full pt-[56.25%] bg-black rounded overflow-hidden">
+                            <iframe class="absolute top-0 left-0 w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        // Exposed to window for inline onclick handlers
+        window.playQueueItem = (index) => {
+            const item = state.queue[index];
+            state.currentMedia = item;
+            // Load into main player
+            els.urlInput.value = item.originalUrl;
+            els.mobileUrlDisplay.textContent = item.mobileUrl;
+            els.openBtn.href = item.mobileUrl;
+            els.resultArea.classList.remove('hidden');
+            
+            const useInvidious = item.preferredBackend === 'invidious';
+            loadMedia(item, useInvidious);
+            
+            // Scroll to player
+            els.playerCard.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.removeFromQueue = removeFromQueue;
+        window.moveQueueItem = moveQueueItem;
+        
+        window.toggleQueueEmbed = (uid) => {
+            const container = document.getElementById(`inline-player-${uid}`);
+            const iframe = container.querySelector('iframe');
+            const item = state.queue.find(i => i.uid === uid);
+            
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                // Determine source
+                const host = item.instance || 'inv.nadeko.net';
+                const useInv = item.preferredBackend === 'invidious';
+                let src = '';
+
+                if (useInv) {
+                    if (item.type === 'playlist') {
+                        src = `https://${host}/embed?list=${item.id}`;
+                    } else {
+                        src = `https://${host}/embed/${item.id}`;
+                    }
+                } else {
+                    if (item.type === 'playlist') {
+                        src = `https://www.youtube.com/embed?listType=playlist&list=${item.id}`;
+                    } else {
+                        src = `https://www.youtube.com/embed/${item.id}`;
+                    }
+                }
+                iframe.src = src;
+            } else {
+                container.classList.add('hidden');
+                iframe.src = ''; // Stop playback
+            }
+        };
+
+        // --- Logic: Settings & Instance ---
+        function saveSettings() {
+            localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.settings));
+        }
+
+        function testInstance() {
+            let host = els.instanceSelect.value;
+            if (host === 'custom') host = els.customInstanceInput.value.trim();
+            if (!host) return;
+
+            const statusEl = els.instanceStatus;
+            statusEl.classList.remove('hidden', 'text-green-500', 'text-yellow-500', 'text-red-500');
+            statusEl.textContent = 'Testing...';
+            statusEl.className = 'text-xs font-bold text-gray-500';
+
+            // Attempt to fetch stats. Many instances block CORS.
+            // We utilize a timeout to fail fast.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            fetch(`https://${host}/api/v1/stats`, { signal: controller.signal })
+                .then(response => {
+                    if (response.ok) {
+                        statusEl.textContent = '🟢 Online';
+                        statusEl.classList.add('text-green-500');
+                    } else {
+                        statusEl.textContent = `🔴 Error ${response.status}`;
+                        statusEl.classList.add('text-red-500');
+                    }
+                })
+                .catch(err => {
+                    // CORS errors usually end up here too
+                    console.log('Instance Test Error:', err);
+                    statusEl.textContent = '🟡 Partial/CORS';
+                    statusEl.classList.add('text-yellow-500');
+                })
+                .finally(() => clearTimeout(timeoutId));
+        }
+
+        // --- Event Listeners Setup ---
+        function setupEventListeners() {
+            // Converter
+            els.convertBtn.addEventListener('click', handleConvert);
+            els.urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleConvert();
+            });
+
+            // Copy
+            els.copyBtn.addEventListener('click', () => {
+                const text = els.mobileUrlDisplay.textContent;
+                if(text) {
+                    navigator.clipboard.writeText(text);
+                    els.copyBtn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
+                    setTimeout(() => els.copyBtn.innerHTML = '<i class="fas fa-copy"></i>', 2000);
+                }
+            });
+
+            // Queue Add
+            els.addToQueueBtn.addEventListener('click', addToQueue);
+            els.clearQueueBtn.addEventListener('click', clearQueue);
+
+            // Theme
+            els.themeToggle.addEventListener('click', () => {
+                const isDark = els.html.classList.toggle('dark');
+                localStorage.setItem(STORAGE_KEYS.THEME, isDark ? 'dark' : 'light');
+            });
+
+            // Player Controls
+            els.toggleBackendBtn.addEventListener('click', toggleBackend);
+
+            // Settings Modal
+            els.settingsBtn.addEventListener('click', () => {
+                els.settingsModal.classList.remove('hidden');
+            });
+            
+            const closeSettings = () => els.settingsModal.classList.add('hidden');
+            els.closeModalBtn.addEventListener('click', closeSettings);
+            els.modalBackdrop.addEventListener('click', closeSettings);
+
+            // Settings Inputs
+            els.preferInvidiousToggle.addEventListener('change', (e) => {
+                state.settings.preferInvidious = e.target.checked;
+                saveSettings();
+            });
+
+            els.instanceSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    els.customInstanceWrapper.classList.remove('hidden');
+                } else {
+                    els.customInstanceWrapper.classList.add('hidden');
+                    state.settings.selectedInstance = e.target.value;
+                    saveSettings();
+                }
+            });
+
+            els.customInstanceInput.addEventListener('input', (e) => {
+                state.settings.selectedInstance = e.target.value.trim();
+                saveSettings();
+            });
+
+            els.testInstanceBtn.addEventListener('click', testInstance);
+        }
+
+        // Run
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
